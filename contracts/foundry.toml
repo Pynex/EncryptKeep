@@ -1,0 +1,20 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.30"
+via_ir = true
+optimizer = true
+optimizer_runs = 99999
+
+remappings = [
+    "ds-test/=lib/ds-test/src/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+]
+
+[invariant]
+show_metrics = false
+
+[lint]
+lint_on_build = false
