@@ -1,0 +1,303 @@
+{
+    "contractName": "IKeeper",
+    "abi": [
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_id",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "bytes",
+                    "name": "_newData",
+                    "type": "bytes"
+                }
+            ],
+            "name": "changeData",
+            "outputs": [],
+            "stateMutability": "payable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_id",
+                    "type": "uint256"
+                }
+            ],
+            "name": "removeData",
+            "outputs": [],
+            "stateMutability": "payable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "bytes",
+                    "name": "_data",
+                    "type": "bytes"
+                }
+            ],
+            "name": "storeData",
+            "outputs": [],
+            "stateMutability": "payable",
+            "type": "function"
+        }
+    ],
+    "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_id\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"_newData\",\"type\":\"bytes\"}],\"name\":\"changeData\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_id\",\"type\":\"uint256\"}],\"name\":\"removeData\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\"}],\"name\":\"storeData\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"c:/Users/ila82/EncryptKeep/contracts/src/interfaces/IKeeper.sol\":\"IKeeper\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[],\"viaIR\":true},\"sources\":{\"c:/Users/ila82/EncryptKeep/contracts/src/interfaces/IKeeper.sol\":{\"keccak256\":\"0xb44e1f8ca7e182a014a9dafa49f2a5163ffb435b51057e69091d28490d3ca9b9\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://350f81a8ecc27575f73a7d5a358b16177230a563ea3cfd1115f61a88e849b245\",\"dweb:/ipfs/QmXJLYzsoUS9gednXD1z6MLc7iAKQdpW9V1bDdLTLjRvFR\"]}},\"version\":1}",
+    "bytecode": "",
+    "deployedBytecode": "",
+    "sourceMap": "",
+    "deployedSourceMap": "",
+    "sourcePath": "c:/Users/ila82/EncryptKeep/contracts/src/interfaces/IKeeper.sol",
+    "compiler": {
+        "name": "solc",
+        "version": "0.8.30+commit.73712a01"
+    },
+    "ast": {
+        "absolutePath": "c:/Users/ila82/EncryptKeep/contracts/src/interfaces/IKeeper.sol",
+        "exportedSymbols": {
+            "IKeeper": [
+                250
+            ]
+        },
+        "id": 251,
+        "license": "MIT",
+        "nodeType": "SourceUnit",
+        "nodes": [
+            {
+                "id": 232,
+                "literals": [
+                    "solidity",
+                    "^",
+                    "0.8",
+                    ".28"
+                ],
+                "nodeType": "PragmaDirective",
+                "src": "33:24:2"
+            },
+            {
+                "abstract": false,
+                "baseContracts": [],
+                "canonicalName": "IKeeper",
+                "contractDependencies": [],
+                "contractKind": "interface",
+                "fullyImplemented": false,
+                "id": 250,
+                "linearizedBaseContracts": [
+                    250
+                ],
+                "name": "IKeeper",
+                "nameLocation": "71:7:2",
+                "nodeType": "ContractDefinition",
+                "nodes": [
+                    {
+                        "functionSelector": "ac5c8535",
+                        "id": 237,
+                        "implemented": false,
+                        "kind": "function",
+                        "modifiers": [],
+                        "name": "storeData",
+                        "nameLocation": "95:9:2",
+                        "nodeType": "FunctionDefinition",
+                        "parameters": {
+                            "id": 235,
+                            "nodeType": "ParameterList",
+                            "parameters": [
+                                {
+                                    "constant": false,
+                                    "id": 234,
+                                    "mutability": "mutable",
+                                    "name": "_data",
+                                    "nameLocation": "120:5:2",
+                                    "nodeType": "VariableDeclaration",
+                                    "scope": 237,
+                                    "src": "105:20:2",
+                                    "stateVariable": false,
+                                    "storageLocation": "calldata",
+                                    "typeDescriptions": {
+                                        "typeIdentifier": "t_bytes_calldata_ptr",
+                                        "typeString": "bytes"
+                                    },
+                                    "typeName": {
+                                        "id": 233,
+                                        "name": "bytes",
+                                        "nodeType": "ElementaryTypeName",
+                                        "src": "105:5:2",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_bytes_storage_ptr",
+                                            "typeString": "bytes"
+                                        }
+                                    },
+                                    "visibility": "internal"
+                                }
+                            ],
+                            "src": "104:22:2"
+                        },
+                        "returnParameters": {
+                            "id": 236,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "143:0:2"
+                        },
+                        "scope": 250,
+                        "src": "86:58:2",
+                        "stateMutability": "payable",
+                        "virtual": false,
+                        "visibility": "external"
+                    },
+                    {
+                        "functionSelector": "f2836502",
+                        "id": 244,
+                        "implemented": false,
+                        "kind": "function",
+                        "modifiers": [],
+                        "name": "changeData",
+                        "nameLocation": "159:10:2",
+                        "nodeType": "FunctionDefinition",
+                        "parameters": {
+                            "id": 242,
+                            "nodeType": "ParameterList",
+                            "parameters": [
+                                {
+                                    "constant": false,
+                                    "id": 239,
+                                    "mutability": "mutable",
+                                    "name": "_id",
+                                    "nameLocation": "178:3:2",
+                                    "nodeType": "VariableDeclaration",
+                                    "scope": 244,
+                                    "src": "170:11:2",
+                                    "stateVariable": false,
+                                    "storageLocation": "default",
+                                    "typeDescriptions": {
+                                        "typeIdentifier": "t_uint256",
+                                        "typeString": "uint256"
+                                    },
+                                    "typeName": {
+                                        "id": 238,
+                                        "name": "uint256",
+                                        "nodeType": "ElementaryTypeName",
+                                        "src": "170:7:2",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_uint256",
+                                            "typeString": "uint256"
+                                        }
+                                    },
+                                    "visibility": "internal"
+                                },
+                                {
+                                    "constant": false,
+                                    "id": 241,
+                                    "mutability": "mutable",
+                                    "name": "_newData",
+                                    "nameLocation": "198:8:2",
+                                    "nodeType": "VariableDeclaration",
+                                    "scope": 244,
+                                    "src": "183:23:2",
+                                    "stateVariable": false,
+                                    "storageLocation": "calldata",
+                                    "typeDescriptions": {
+                                        "typeIdentifier": "t_bytes_calldata_ptr",
+                                        "typeString": "bytes"
+                                    },
+                                    "typeName": {
+                                        "id": 240,
+                                        "name": "bytes",
+                                        "nodeType": "ElementaryTypeName",
+                                        "src": "183:5:2",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_bytes_storage_ptr",
+                                            "typeString": "bytes"
+                                        }
+                                    },
+                                    "visibility": "internal"
+                                }
+                            ],
+                            "src": "169:38:2"
+                        },
+                        "returnParameters": {
+                            "id": 243,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "224:0:2"
+                        },
+                        "scope": 250,
+                        "src": "150:75:2",
+                        "stateMutability": "payable",
+                        "virtual": false,
+                        "visibility": "external"
+                    },
+                    {
+                        "functionSelector": "a94840bb",
+                        "id": 249,
+                        "implemented": false,
+                        "kind": "function",
+                        "modifiers": [],
+                        "name": "removeData",
+                        "nameLocation": "240:10:2",
+                        "nodeType": "FunctionDefinition",
+                        "parameters": {
+                            "id": 247,
+                            "nodeType": "ParameterList",
+                            "parameters": [
+                                {
+                                    "constant": false,
+                                    "id": 246,
+                                    "mutability": "mutable",
+                                    "name": "_id",
+                                    "nameLocation": "259:3:2",
+                                    "nodeType": "VariableDeclaration",
+                                    "scope": 249,
+                                    "src": "251:11:2",
+                                    "stateVariable": false,
+                                    "storageLocation": "default",
+                                    "typeDescriptions": {
+                                        "typeIdentifier": "t_uint256",
+                                        "typeString": "uint256"
+                                    },
+                                    "typeName": {
+                                        "id": 245,
+                                        "name": "uint256",
+                                        "nodeType": "ElementaryTypeName",
+                                        "src": "251:7:2",
+                                        "typeDescriptions": {
+                                            "typeIdentifier": "t_uint256",
+                                            "typeString": "uint256"
+                                        }
+                                    },
+                                    "visibility": "internal"
+                                }
+                            ],
+                            "src": "250:13:2"
+                        },
+                        "returnParameters": {
+                            "id": 248,
+                            "nodeType": "ParameterList",
+                            "parameters": [],
+                            "src": "280:0:2"
+                        },
+                        "scope": 250,
+                        "src": "231:50:2",
+                        "stateMutability": "payable",
+                        "virtual": false,
+                        "visibility": "external"
+                    }
+                ],
+                "scope": 251,
+                "src": "61:223:2",
+                "usedErrors": [],
+                "usedEvents": []
+            }
+        ],
+        "src": "33:251:2"
+    },
+    "functionHashes": {
+        "changeData(uint256,bytes)": "f2836502",
+        "removeData(uint256)": "a94840bb",
+        "storeData(bytes)": "ac5c8535"
+    },
+    "gasEstimates": null
+}
