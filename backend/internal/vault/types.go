@@ -1,42 +1,56 @@
 package vault
 
-package vault
-
 import (
-	"time"
 	"crypto/rand"
 	"encoding/hex"
+	"math/big"
+	"time"
 )
 
+// uint256 represents a 256-bit unsigned integer for blockchain compatibility
+type uint256 = *big.Int
+
 type PasswordEntry struct {
-	ID string `json:"id"`
-	Title string `json:"title"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	URL string `json:"url"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	IsFavorite bool `json:"is_favorite"`
+	ID         string    `json:"id"`
+	Title      string    `json:"title"`
+	Username   string    `json:"username"`
+	Password   string    `json:"password"`
+	URL        string    `json:"url"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	IsFavorite bool      `json:"is_favorite"`
 }
 
-type EncryptedPasswordEntry struct {
-	ID string `json:"id"`
+// Blockchain-specific types for individual blob storage
+type BlockchainEntry struct {
+	ContractID uint256        `json:"contract_id"` // ID в контракте (uint256)
+	Entry      *PasswordEntry `json:"entry"`
+}
+
+type BlockchainMetadata struct {
+	Version      string            `json:"version"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+	Settings     map[string]string `json:"settings"`
+	TotalEntries int               `json:"total_entries"`
+}
+
+// Encrypted blob types for blockchain storage
+type EncryptedEntryBlob struct {
 	EncryptedData []byte `json:"encrypted_data"`
-	Nonce []byte `json:"nonce"`
+	Nonce         []byte `json:"nonce"`
+}
+
+type EncryptedMetadataBlob struct {
+	EncryptedData []byte `json:"encrypted_data"`
+	Nonce         []byte `json:"nonce"`
 }
 
 type UserMetadata struct {
-	Version       string            `json:"version"`
-	Settings      map[string]string `json:"settings"`
-	PasswordIDs   []string          `json:"password_ids"`
-	UpdatedAt     time.Time         `json:"updated_at"`
-	TotalEntries  int               `json:"total_entries"`
-}
-
-type EncryptedUserMetadata struct {
-	EncryptedData []byte    `json:"encrypted_data"`
-	Nonce         []byte    `json:"nonce"`
-	UpdatedAt     uint64    `json:"updated_at"`
+	Version      string            `json:"version"`
+	Settings     map[string]string `json:"settings"`
+	PasswordIDs  []string          `json:"password_ids"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+	TotalEntries int               `json:"total_entries"`
 }
 
 type LocalVault struct {
@@ -44,6 +58,9 @@ type LocalVault struct {
 	Metadata     *UserMetadata             `json:"metadata"`
 	LastSyncTime time.Time                 `json:"last_sync_time"`
 	IsDirty      bool                      `json:"is_dirty"` // unsaved changes
+
+	// Blockchain mapping: local ID -> contract ID
+	BlockchainEntries map[string]uint256 `json:"blockchain_entries"`
 }
 
 type MasterKey struct {
@@ -52,17 +69,17 @@ type MasterKey struct {
 }
 
 type VaultConfig struct {
-	Argon2Time      uint32 
+	Argon2Time      uint32
 	Argon2Memory    uint32
 	Argon2Threads   uint8
 	Argon2KeyLength uint32
 }
 
 type SyncStatus struct {
-	LastSyncTime      time.Time         `json:"last_sync_time"`
-	PendingChanges    map[string]string `json:"pending_changes"` // ID -> "add"/"update"/"delete"
-	FailedSyncs       int               `json:"failed_syncs"`
-	IsOnline          bool              `json:"is_online"`
+	LastSyncTime   time.Time         `json:"last_sync_time"`
+	PendingChanges map[string]string `json:"pending_changes"` // ID -> "add"/"update"/"delete"
+	FailedSyncs    int               `json:"failed_syncs"`
+	IsOnline       bool              `json:"is_online"`
 }
 
 type BlockchainConfig struct {
@@ -91,8 +108,9 @@ func NewLocalVault() *LocalVault {
 			UpdatedAt:    time.Now(),
 			TotalEntries: 0,
 		},
-		LastSyncTime: time.Now(),
-		IsDirty:      false,
+		LastSyncTime:      time.Now(),
+		IsDirty:           false,
+		BlockchainEntries: make(map[string]uint256),
 	}
 }
 
@@ -111,7 +129,7 @@ func NewPasswordEntry(title, username, password string) *PasswordEntry {
 
 func generateID() string {
 	b := make([]byte, 16)
-	if _,err := rand.Read(b); err != nil {
+	if _, err := rand.Read(b); err != nil {
 		return time.Now().Format("20060102150405999")
 	}
 
