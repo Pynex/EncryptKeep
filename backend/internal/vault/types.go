@@ -61,6 +61,7 @@ type LocalVault struct {
 
 	// Blockchain mapping: local ID -> contract ID
 	BlockchainEntries map[string]uint256 `json:"blockchain_entries"`
+	// Метаданные не имеют ID в контракте - хранятся как userMetaData[address]
 }
 
 type MasterKey struct {
