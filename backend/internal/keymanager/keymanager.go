@@ -7,6 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"unicode/utf8"
+
+	"encryptkeep-backend/internal/codec"
+	localcrypto "encryptkeep-backend/internal/crypto"
+	"encryptkeep-backend/internal/vault"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 type KeyManager struct {
@@ -40,6 +46,7 @@ func NewKeyManager(config KeyManagerConfig) *KeyManager {
 		ConfigDir:     config.ConfigDir,
 		SessionActive: false,
 		LastActivity:  time.Now(),
+		config:        config,
 	}
 }
 
@@ -47,6 +54,23 @@ func (km *KeyManager) HasStoredKeys() bool {
 	keyFilePath := km.getKeyFilePath()
 	_, err := os.Stat(keyFilePath)
 	return err == nil
+}
+
+func (km *KeyManager) GetAddress() (string, error) {
+	if !km.IsSessionActive() {
+		return "", fmt.Errorf("session is not active")
+	}
+
+	publicKey := km.PrivateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return "", fmt.Errorf("invalid public key")
+	}
+	userAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+
+	km.UpdateActivity()
+
+	return userAddress.Hex(), nil
 }
 
 func (km *KeyManager) getKeyFilePath() string {
@@ -127,4 +151,105 @@ func (km *KeyManager) GetMasterKey() ([]byte, error) {
 
 	km.LastActivity = time.Now()
 	return km.MasterKey, nil
+}
+
+func (km *KeyManager) UpdateActivity() {
+	if km.SessionActive {
+		km.LastActivity = time.Now()
+	}
+}
+
+func (km *KeyManager) LoadFromStorage(masterPassword string) error {
+	loadedData, err := km.loadKeyData()
+	if err != nil {
+		return err
+	}
+
+	encrypted := localcrypto.Sealed{
+		Salt:       loadedData.Salt,
+		Nonce:      loadedData.Nonce,
+		Ciphertext: loadedData.EncryptedPrivateKey,
+	}
+
+	privateKeyHex, err := localcrypto.Open(masterPassword, codec.FromVaultConfig(vault.DefaultVaultConfig()), encrypted)
+	if err != nil {
+		return err
+	}
+
+	privateKey, err := crypto.HexToECDSA(string(privateKeyHex))
+	if err != nil {
+		return err
+	}
+
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("invalid public key")
+	}
+	userAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+	if userAddress.Hex() != loadedData.Address {
+		return fmt.Errorf("addresses mismatch")
+	}
+
+	return km.startSession(privateKey, masterPassword)
+}
+
+func (km *KeyManager) InitializeFirstTime(privateKeyHex, masterPassword string) error {
+	if len(privateKeyHex) != 64 {
+		return fmt.Errorf("invalid private key")
+	}
+
+	if len(masterPassword) < 8 {
+		return fmt.Errorf("master password should be greater or equal 8")
+	}
+
+	if !utf8.ValidString(privateKeyHex) {
+		return fmt.Errorf("invalid private key hex")
+	}
+
+	privateKey, err := crypto.HexToECDSA(privateKeyHex)
+	if err != nil {
+		return err
+	}
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("invalid public key")
+	}
+	userAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+
+	argon := codec.FromVaultConfig(vault.DefaultVaultConfig())
+
+	sealed, err := localcrypto.Seal(masterPassword, argon, []byte(privateKeyHex))
+	if err != nil {
+		return err
+	}
+
+	storedData := StoredKeyData{
+		EncryptedPrivateKey: sealed.Ciphertext,
+		Salt:                sealed.Salt,
+		Nonce:               sealed.Nonce,
+		CreatedAt:           time.Now().Format(time.RFC3339),
+		Address:             userAddress.Hex(),
+	}
+
+	if err := km.saveKeyData(storedData); err != nil {
+		return err
+	}
+
+	return km.startSession(privateKey, masterPassword)
+}
+
+func (km *KeyManager) startSession(privateKey *ecdsa.PrivateKey, masterPassword string) error {
+	dk, err := localcrypto.DeriveKey(masterPassword, nil, codec.FromVaultConfig(vault.DefaultVaultConfig()))
+	if err != nil {
+		return err
+	}
+
+	km.PrivateKey = privateKey
+	km.MasterKey = dk.Key
+	km.SessionActive = true
+	km.LastActivity = time.Now()
+
+	return nil
 }

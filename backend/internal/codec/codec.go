@@ -37,7 +37,7 @@ func (c *Codec) PackEntry(passwordEntry *vault.PasswordEntry, masterPassword str
 		return nil, errors.New("passwordEntry cannot be empty")
 	}
 
-	if len(masterPassword) == 0 {
+	if len(masterPassword) < 8 { //min 8
 		return nil, errors.New("master password cannot be empty")
 	}
 
@@ -69,7 +69,7 @@ func (c *Codec) PackMetadata(metadata *vault.UserMetadata, masterPassword string
 		return nil, errors.New("metadata cannot be empty")
 	}
 
-	if len(masterPassword) == 0 {
+	if len(masterPassword) < 8 {
 		return nil, errors.New("master password cannot be empty")
 	}
 
@@ -104,7 +104,7 @@ func (c *Codec) PackMetadata(metadata *vault.UserMetadata, masterPassword string
 }
 
 func (c *Codec) UnpackEntry(encryptedData []byte, masterPassword string) (*vault.PasswordEntry, error) {
-	if len(masterPassword) == 0 {
+	if len(masterPassword) < 8 {
 		return nil, errors.New("master password cannot be empty")
 	}
 
@@ -147,7 +147,7 @@ func FromVaultConfig(vaultCfg *vault.VaultConfig) crypto.Argon2Config {
 }
 
 func (c *Codec) UnpackMetadata(encryptedData []byte, masterPassword string) (*vault.UserMetadata, error) {
-	if len(masterPassword) == 0 {
+	if len(masterPassword) < 8 {
 		return nil, errors.New("master password cannot be empty")
 	}
 
