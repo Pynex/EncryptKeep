@@ -1,44 +1,58 @@
 package blockchain
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 )
 
-// BlockchainConfig содержит конфигурацию для подключения к блокчейну
 type BlockchainConfig struct {
-	RPCEndpoint     string   `json:"rpc_endpoint"`     // URL RPC ноды
-	ContractAddress string   `json:"contract_address"` // Адрес контракта
-	ChainID         int64    `json:"chain_id"`         // ID сети
-	GasLimit        uint64   `json:"gas_limit"`        // Лимит газа
-	GasPrice        *big.Int `json:"gas_price"`        // Цена газа
+	RPCEndpoint     string   `json:"rpc_endpoint"`
+	ContractAddress string   `json:"contract_address"`
+	ChainID         int64    `json:"chain_id"`
+	GasLimit        uint64   `json:"gas_limit"`
+	GasPrice        *big.Int `json:"gas_price"`
 }
 
-// UserData представляет данные пользователя в блокчейне
 type UserData struct {
-	Address     string     `json:"address"`      // Адрес пользователя
-	Metadata    []byte     `json:"metadata"`     // Метаданные пользователя (один blob)
-	EntryIDs    []*big.Int `json:"entry_ids"`    // ID записей из activeIdsForUser
-	LastUpdated time.Time  `json:"last_updated"` // Время последнего обновления
+	Address     string     `json:"address"`
+	Metadata    []byte     `json:"metadata"`
+	EntryIDs    []*big.Int `json:"entry_ids"`
+	LastUpdated time.Time  `json:"last_updated"`
 }
 
-// TransactionResult результат транзакции
 type TransactionResult struct {
-	Success   bool      `json:"success"`   // Успешность транзакции
-	Timestamp time.Time `json:"timestamp"` // Время транзакции
+	Success   bool      `json:"success"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
-// SyncStatus статус синхронизации
 type SyncStatus struct {
-	IsOnline     bool      `json:"is_online"`      // Онлайн ли блокчейн
-	LastSyncTime time.Time `json:"last_sync_time"` // Время последней синхронизации
+	IsOnline     bool      `json:"is_online"`
+	LastSyncTime time.Time `json:"last_sync_time"`
 }
 
-// Session представляет сессию пользователя
 type Session struct {
-	Address    string    `json:"address"`     // Адрес пользователя (из приватного ключа)
-	PrivateKey string    `json:"private_key"` // Приватный ключ (хранится в памяти)
-	MasterKey  []byte    `json:"master_key"`  // Мастер-ключ (деривированный из пароля)
-	CreatedAt  time.Time `json:"created_at"`  // Время создания сессии
-	LastUsed   time.Time `json:"last_used"`   // Время последнего использования
+	Address        string    `json:"address"`
+	PrivateKey     string    `json:"private_key"`
+	MasterPassword string    `json:"master_password"`
+	CreatedAt      time.Time `json:"created_at"`
+	LastUsed       time.Time `json:"last_used"`
+}
+
+func GetDefaultConfig() *BlockchainConfig {
+	return &BlockchainConfig{
+		RPCEndpoint:     "https://sepolia.base.org",
+		ContractAddress: "0x02a06b3427A2D949E971Bd80606996C75ae9fEa9",
+		ChainID:         84532,
+		GasLimit:        1_000_000,
+		GasPrice:        nil,
+	}
+}
+
+func NewClientWithConfig(config *BlockchainConfig) (*Client, error) {
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+
+	return NewClient(config)
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// uint256 represents a 256-bit unsigned integer for blockchain compatibility
 type uint256 = *big.Int
 
 type PasswordEntry struct {
@@ -21,9 +20,8 @@ type PasswordEntry struct {
 	IsFavorite bool      `json:"is_favorite"`
 }
 
-// Blockchain-specific types for individual blob storage
 type BlockchainEntry struct {
-	ContractID uint256        `json:"contract_id"` // ID в контракте (uint256)
+	ContractID uint256        `json:"contract_id"`
 	Entry      *PasswordEntry `json:"entry"`
 }
 
@@ -34,14 +32,15 @@ type BlockchainMetadata struct {
 	TotalEntries int               `json:"total_entries"`
 }
 
-// Encrypted blob types for blockchain storage
 type EncryptedEntryBlob struct {
 	EncryptedData []byte `json:"encrypted_data"`
+	Salt          []byte `json:"salt"`
 	Nonce         []byte `json:"nonce"`
 }
 
 type EncryptedMetadataBlob struct {
 	EncryptedData []byte `json:"encrypted_data"`
+	Salt          []byte `json:"salt"`
 	Nonce         []byte `json:"nonce"`
 }
 
@@ -59,9 +58,7 @@ type LocalVault struct {
 	LastSyncTime time.Time                 `json:"last_sync_time"`
 	IsDirty      bool                      `json:"is_dirty"` // unsaved changes
 
-	// Blockchain mapping: local ID -> contract ID
 	BlockchainEntries map[string]uint256 `json:"blockchain_entries"`
-	// Метаданные не имеют ID в контракте - хранятся как userMetaData[address]
 }
 
 type MasterKey struct {
@@ -83,19 +80,12 @@ type SyncStatus struct {
 	IsOnline       bool              `json:"is_online"`
 }
 
-type BlockchainConfig struct {
-	RPCEndpoint     string `json:"rpc_endpoint"`
-	ContractAddress string `json:"contract_address"`
-	ChainID         int64  `json:"chain_id"`
-	GasLimit        uint64 `json:"gas_limit"`
-}
-
 func DefaultVaultConfig() *VaultConfig {
 	return &VaultConfig{
-		Argon2Time:      3,         // 3 итерации
-		Argon2Memory:    64 * 1024, // 64 МБ
-		Argon2Threads:   4,         // 4 потока
-		Argon2KeyLength: 32,        // 32 байта для AES-256
+		Argon2Time:      3, 
+		Argon2Memory:    64 * 1024,
+		Argon2Threads:   4,
+		Argon2KeyLength: 32,
 	}
 }
 

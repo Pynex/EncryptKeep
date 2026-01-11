@@ -25,7 +25,6 @@ func NewCodecWithConfig(cfg crypto.Argon2Config) *Codec {
 	}
 }
 
-// NewCodecWithVaultConfig creates a codec with vault.VaultConfig
 func NewCodecWithVaultConfig(vaultCfg *vault.VaultConfig) *Codec {
 	return &Codec{
 		argon2Config: FromVaultConfig(vaultCfg),
@@ -53,6 +52,7 @@ func (c *Codec) PackEntry(passwordEntry *vault.PasswordEntry, masterPassword str
 
 	encryptedBlob := &vault.EncryptedEntryBlob{
 		EncryptedData: sealed.Ciphertext,
+		Salt:          sealed.Salt,
 		Nonce:         sealed.Nonce,
 	}
 
@@ -92,6 +92,7 @@ func (c *Codec) PackMetadata(metadata *vault.UserMetadata, masterPassword string
 
 	encryptedBlob := &vault.EncryptedMetadataBlob{
 		EncryptedData: sealed.Ciphertext,
+		Salt:          sealed.Salt,
 		Nonce:         sealed.Nonce,
 	}
 
@@ -118,7 +119,7 @@ func (c *Codec) UnpackEntry(encryptedData []byte, masterPassword string) (*vault
 		return nil, fmt.Errorf("failed to unmarshal metadata^ %w", err)
 	}
 	sealed := crypto.Sealed{
-		Salt:       nil,
+		Salt:       encryptedBlob.Salt,
 		Nonce:      encryptedBlob.Nonce,
 		Ciphertext: encryptedBlob.EncryptedData,
 	}
@@ -136,7 +137,6 @@ func (c *Codec) UnpackEntry(encryptedData []byte, masterPassword string) (*vault
 	return &entry, nil
 }
 
-// FromVaultConfig converts vault.VaultConfig to crypto.Argon2Config
 func FromVaultConfig(vaultCfg *vault.VaultConfig) crypto.Argon2Config {
 	return crypto.Argon2Config{
 		Time:      vaultCfg.Argon2Time,
@@ -161,7 +161,7 @@ func (c *Codec) UnpackMetadata(encryptedData []byte, masterPassword string) (*va
 		return nil, fmt.Errorf("failed to unmarshal metadata^ %w", err)
 	}
 	sealed := crypto.Sealed{
-		Salt:       nil,
+		Salt:       encryptedBlob.Salt,
 		Nonce:      encryptedBlob.Nonce,
 		Ciphertext: encryptedBlob.EncryptedData,
 	}

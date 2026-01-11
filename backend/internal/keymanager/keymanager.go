@@ -12,6 +12,7 @@ import (
 	"encryptkeep-backend/internal/codec"
 	localcrypto "encryptkeep-backend/internal/crypto"
 	"encryptkeep-backend/internal/vault"
+
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -42,12 +43,36 @@ func NewKeyManager(config KeyManagerConfig) *KeyManager {
 		config.SessionTimeout = 60 * 4 * time.Minute
 	}
 
+	if config.ConfigDir == "" {
+		config.ConfigDir = defaultConfigDir()
+	}
+
 	return &KeyManager{
 		ConfigDir:     config.ConfigDir,
 		SessionActive: false,
 		LastActivity:  time.Now(),
 		config:        config,
 	}
+}
+
+// - Windows: %AppData%\encryptkeep\keys
+// - Linux:   $XDG_CONFIG_HOME/encryptkeep/keys or ~/.config/encryptkeep/keys
+// - macOS:   ~/Library/Application Support/encryptkeep/keys
+func defaultConfigDir() string {
+	if v := os.Getenv("ENCRYPTKEEP_CONFIG_DIR"); v != "" {
+		return v
+	}
+
+	base, err := os.UserConfigDir()
+	if err != nil || base == "" {
+		home, _ := os.UserHomeDir()
+		if home == "" {
+			return "encryptkeep/keys"
+		}
+		base = filepath.Join(home, ".config")
+	}
+
+	return filepath.Join(base, "encryptkeep", "keys")
 }
 
 func (km *KeyManager) HasStoredKeys() bool {

@@ -3,44 +3,46 @@ package blockchain
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+
 	// "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// Client представляет клиент для работы с блокчейном
 type Client struct {
 	config   *BlockchainConfig
 	client   *ethclient.Client
 	contract *KeeperContract
 	chainID  *big.Int
-	session  *Session // Текущая сессия пользователя
+	session  *Session
 }
 
-// NewClient создаёт новый клиент блокчейна
+// type GasConfig struct {
+// 	MaxGasPrice   *big.Int
+// 	GasMultiplier float64
+// 	MaxGasLimit   uint64
+// 	PriorityFee   *big.Int
+// 	MaxFeePerGas  *big.Int
+// }
+
+// type ClientConfig struct {
+// 	RPCEndpoint string
+// 	ContractAddress string
+// 	ChainID int64
+// }
+
 func NewClient(config *BlockchainConfig) (*Client, error) {
-	// Подключение к RPC ноде
 	client, err := ethclient.Dial(config.RPCEndpoint)
 	if err != nil {
 		return nil, ErrConnectionFailed
 	}
 
-	// Получение chainID
-	chainID, err := client.NetworkID(context.Background())
-	if err != nil {
-		return nil, ErrConnectionFailed
-	}
-
-	// Проверка chainID
-	if chainID.Int64() != config.ChainID {
-		return nil, ErrInvalidChainID
-	}
-
-	// Создание контракта
 	contract, err := NewKeeperContract(client, config.ContractAddress)
 	if err != nil {
 		return nil, ErrContractNotFound
@@ -50,26 +52,115 @@ func NewClient(config *BlockchainConfig) (*Client, error) {
 		config:   config,
 		client:   client,
 		contract: contract,
-		chainID:  chainID,
+		chainID:  big.NewInt(config.ChainID),
 	}, nil
 }
 
-// GetUserMetadata получает метаданные пользователя
+func (c *Client) EstimateGas(ctx context.Context, method string, args ...interface{}) (uint64, error) {
+	if method == "storeMetadata" {
+		data := args[0].([]byte)
+		tx, err := c.contract.contract.StoreMetaData(&bind.TransactOpts{
+			Context: ctx,
+			NoSend:  true,
+		}, data)
+		if err != nil {
+			return 0, err
+		}
+
+		gas, err := c.client.EstimateGas(ctx, ethereum.CallMsg{
+			To:   &c.contract.address,
+			Data: tx.Data(),
+		})
+		if err != nil {
+			return 0, err
+		}
+
+		return gas, nil
+	}
+
+	if method == "storeData" {
+		data := args[0].([]byte)
+		tx, err := c.contract.contract.StoreData(&bind.TransactOpts{
+			Context: ctx,
+			NoSend:  true,
+		}, data)
+		if err != nil {
+			return 0, err
+		}
+
+		gas, err := c.client.EstimateGas(ctx, ethereum.CallMsg{
+			To:   &c.contract.address,
+			Data: tx.Data(),
+		})
+		if err != nil {
+			return 0, err
+		}
+
+		return gas, nil
+	}
+
+	if method == "changeData" {
+		dataID := args[0].(*big.Int)
+		data := args[1].([]byte)
+		tx, err := c.contract.contract.ChangeData(&bind.TransactOpts{
+			Context: ctx,
+			NoSend:  true,
+		}, dataID, data)
+		if err != nil {
+			return 0, err
+		}
+
+		gas, err := c.client.EstimateGas(ctx, ethereum.CallMsg{
+			To:   &c.contract.address,
+			Data: tx.Data(),
+		})
+		if err != nil {
+			return 0, err
+		}
+
+		return gas, nil
+	}
+
+	if method == "removeData" {
+		dataID := args[0].(*big.Int)
+		tx, err := c.contract.contract.RemoveData(&bind.TransactOpts{
+			Context: ctx,
+			NoSend:  true,
+		}, dataID)
+		if err != nil {
+			return 0, err
+		}
+
+		gas, err := c.client.EstimateGas(ctx, ethereum.CallMsg{
+			To:   &c.contract.address,
+			Data: tx.Data(),
+		})
+		if err != nil {
+			return 0, err
+		}
+
+		return gas, nil
+	}
+
+	return 0, fmt.Errorf("unknown method")
+}
+
+// func (c *Client) GetOptimalGasPrice(ctx context.Context) (*big.Int, *big.Int, error) {
+// 	return c.contract
+// }
+
 func (c *Client) GetUserMetadata(ctx context.Context, userAddress string) ([]byte, error) {
 	return c.contract.GetUserMetadata(ctx, userAddress)
 }
 
-// GetUserData получает данные пользователя по ID
 func (c *Client) GetUserData(ctx context.Context, userAddress string, dataID *big.Int) ([]byte, error) {
 	return c.contract.GetUserData(ctx, userAddress, dataID)
 }
 
-// GetActiveIds получает список активных ID для пользователя
 func (c *Client) GetActiveIds(ctx context.Context, userAddress string) ([]*big.Int, error) {
 	return c.contract.GetActiveIds(ctx, userAddress)
 }
 
-// StoreMetadata сохраняет метаданные пользователя
 func (c *Client) StoreMetadata(ctx context.Context, data []byte) (*TransactionResult, error) {
 	if c.session == nil {
 		return nil, ErrInvalidPrivateKey
@@ -83,7 +174,6 @@ func (c *Client) StoreMetadata(ctx context.Context, data []byte) (*TransactionRe
 	return c.contract.StoreMetadata(ctx, auth, data)
 }
 
-// StoreData сохраняет данные пользователя
 func (c *Client) StoreData(ctx context.Context, data []byte) (*TransactionResult, error) {
 	if c.session == nil {
 		return nil, ErrInvalidPrivateKey
@@ -97,7 +187,6 @@ func (c *Client) StoreData(ctx context.Context, data []byte) (*TransactionResult
 	return c.contract.StoreData(ctx, auth, data)
 }
 
-// ChangeData изменяет данные пользователя
 func (c *Client) ChangeData(ctx context.Context, dataID *big.Int, data []byte) (*TransactionResult, error) {
 	if c.session == nil {
 		return nil, ErrInvalidPrivateKey
@@ -111,7 +200,6 @@ func (c *Client) ChangeData(ctx context.Context, dataID *big.Int, data []byte) (
 	return c.contract.ChangeData(ctx, auth, dataID, data)
 }
 
-// RemoveData удаляет данные пользователя
 func (c *Client) RemoveData(ctx context.Context, dataID *big.Int) (*TransactionResult, error) {
 	if c.session == nil {
 		return nil, ErrInvalidPrivateKey
@@ -125,7 +213,6 @@ func (c *Client) RemoveData(ctx context.Context, dataID *big.Int) (*TransactionR
 	return c.contract.RemoveData(ctx, auth, dataID)
 }
 
-// createAuth создаёт авторизацию для транзакций
 func (c *Client) createAuth(privateKeyHex string) (*bind.TransactOpts, error) {
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
@@ -163,7 +250,6 @@ func (c *Client) createAuth(privateKeyHex string) (*bind.TransactOpts, error) {
 	return auth, nil
 }
 
-// Close закрывает соединение с блокчейном
 func (c *Client) Close() error {
 	if c.client != nil {
 		c.client.Close()
@@ -171,9 +257,7 @@ func (c *Client) Close() error {
 	return nil
 }
 
-// GetSyncStatus получает статус синхронизации
 func (c *Client) GetSyncStatus(ctx context.Context) (*SyncStatus, error) {
-	// Проверка подключения
 	_, err := c.client.NetworkID(ctx)
 	isOnline := err == nil
 
@@ -183,9 +267,7 @@ func (c *Client) GetSyncStatus(ctx context.Context) (*SyncStatus, error) {
 	}, nil
 }
 
-// CreateSession создаёт новую сессию пользователя
-func (c *Client) CreateSession(privateKeyHex string, masterKey []byte) (*Session, error) {
-	// Получение адреса из приватного ключа
+func (c *Client) CreateSession(privateKeyHex string, masterPassword string) (*Session, error) {
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
 		return nil, ErrInvalidPrivateKey
@@ -200,18 +282,17 @@ func (c *Client) CreateSession(privateKeyHex string, masterKey []byte) (*Session
 	address := crypto.PubkeyToAddress(*publicKeyECDSA)
 
 	session := &Session{
-		Address:    address.Hex(),
-		PrivateKey: privateKeyHex,
-		MasterKey:  masterKey,
-		CreatedAt:  time.Now(),
-		LastUsed:   time.Now(),
+		Address:        address.Hex(),
+		PrivateKey:     privateKeyHex,
+		MasterPassword: masterPassword,
+		CreatedAt:      time.Now(),
+		LastUsed:       time.Now(),
 	}
 
 	c.session = session
 	return session, nil
 }
 
-// GetSession получает текущую сессию
 func (c *Client) GetSession() *Session {
 	if c.session != nil {
 		c.session.LastUsed = time.Now()
@@ -219,12 +300,10 @@ func (c *Client) GetSession() *Session {
 	return c.session
 }
 
-// ClearSession очищает текущую сессию
 func (c *Client) ClearSession() {
 	if c.session != nil {
-		// Очищаем чувствительные данные
 		c.session.PrivateKey = ""
-		c.session.MasterKey = nil
+		c.session.MasterPassword = ""
 		c.session = nil
 	}
 }

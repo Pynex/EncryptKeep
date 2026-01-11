@@ -142,22 +142,16 @@ func GenerateNonce() ([]byte, error) {
 }
 
 func Seal(masterPassword string, cfg Argon2Config, plaintext []byte) (Sealed, error) {
-	// Получаем симметричный ключ из мастер‑пароля. Если соль не передана,
-	// DeriveKey сам сгенерирует её и вернёт вместе с ключом.
 	dk, err := DeriveKey(masterPassword, nil, cfg)
 	if err != nil {
 		return Sealed{}, err
 	}
 
-	// Шифруем данные под полученным ключом (AES‑GCM),
-	// внутри генерируется свежий 12‑байтовый nonce.
 	ciphertext, nonce, err := Encrypt(dk.Key, plaintext)
 	if err != nil {
 		return Sealed{}, err
 	}
 
-	// Возвращаем компактный контейнер со всеми частями,
-	// необходимыми для последующей расшифровки.
 	return Sealed{
 		Salt:       dk.Salt,
 		Nonce:      nonce,
