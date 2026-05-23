@@ -3,6 +3,7 @@ import {
   HasStoredKeys,
   InitializeNewKeys,
   IsUnlocked,
+  ResetStoredKeys,
   Unlock,
 } from "../api";
 
@@ -49,6 +50,28 @@ export function UnlockView({ onUnlocked }: Props) {
     }
   }
 
+  async function resetStoredKeys() {
+    if (
+      !confirm(
+        "Удалить локально сохраненный аккаунт и ввести новый приватный ключ?"
+      )
+    ) {
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      await ResetStoredKeys();
+      setHasKeys(false);
+      setMasterPassword("");
+      setPrivateKeyHex("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="panel unlock-panel">
       <h1>EncryptKeep</h1>
@@ -84,6 +107,11 @@ export function UnlockView({ onUnlocked }: Props) {
         <button type="submit" className="btn primary" disabled={loading}>
           {loading ? "Подключение…" : hasKeys ? "Разблокировать" : "Создать и войти"}
         </button>
+        {hasKeys && (
+          <button type="button" className="btn" onClick={resetStoredKeys} disabled={loading}>
+            Добавить новый аккаунт
+          </button>
+        )}
       </form>
     </div>
   );

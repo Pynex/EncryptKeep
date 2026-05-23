@@ -81,6 +81,18 @@ func (km *KeyManager) HasStoredKeys() bool {
 	return err == nil
 }
 
+// DeleteStoredKeys removes encrypted keys from local storage.
+func (km *KeyManager) DeleteStoredKeys() error {
+	keyFilePath := km.getKeyFilePath()
+	if err := os.Remove(keyFilePath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	// Best effort: cleanup the directory if it is empty.
+	_ = os.Remove(km.ConfigDir)
+	km.ClearSession()
+	return nil
+}
+
 func (km *KeyManager) GetAddress() (string, error) {
 	if !km.IsSessionActive() {
 		return "", fmt.Errorf("session is not active")

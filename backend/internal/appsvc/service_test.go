@@ -1,6 +1,12 @@
 package appsvc
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"encryptkeep-backend/internal/keymanager"
+)
 
 func TestNormalizeMasterPassword(t *testing.T) {
 	tests := []struct {
@@ -37,5 +43,26 @@ func TestNormalizeMasterPassword(t *testing.T) {
 				t.Fatalf("normalizeMasterPassword() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestResetStoredKeys(t *testing.T) {
+	configDir := t.TempDir()
+	keyFilePath := filepath.Join(configDir, "keys.json")
+	if err := os.WriteFile(keyFilePath, []byte(`{"sample":"data"}`), 0o600); err != nil {
+		t.Fatalf("write test key file: %v", err)
+	}
+
+	svc := &Service{
+		km: keymanager.NewKeyManager(keymanager.KeyManagerConfig{
+			ConfigDir: configDir,
+		}),
+	}
+
+	if err := svc.ResetStoredKeys(); err != nil {
+		t.Fatalf("ResetStoredKeys() error = %v", err)
+	}
+	if _, err := os.Stat(keyFilePath); !os.IsNotExist(err) {
+		t.Fatalf("expected key file removed, stat err = %v", err)
 	}
 }

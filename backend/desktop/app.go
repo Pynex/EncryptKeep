@@ -58,6 +58,11 @@ func (a *App) Lock() {
 	a.svc.Lock()
 }
 
+// ResetStoredKeys removes locally stored encrypted keys for account re-onboarding.
+func (a *App) ResetStoredKeys() error {
+	return a.svc.ResetStoredKeys()
+}
+
 // ListEntries returns all password entries.
 func (a *App) ListEntries() ([]*vault.PasswordEntry, error) {
 	return a.svc.ListEntries()

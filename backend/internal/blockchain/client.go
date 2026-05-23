@@ -72,6 +72,17 @@ func NewClient(config *BlockchainConfig) (*Client, error) {
 			continue
 		}
 
+		// Dial for HTTP RPC may defer actual network IO until first request.
+		// Probe the endpoint immediately so fallback can trigger early.
+		probeCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		_, err = client.NetworkID(probeCtx)
+		cancel()
+		if err != nil {
+			client.Close()
+			lastErr = err
+			continue
+		}
+
 		contract, err := NewKeeperContract(client, config.ContractAddress)
 		if err != nil {
 			client.Close()

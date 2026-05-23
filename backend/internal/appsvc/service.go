@@ -154,6 +154,17 @@ func (s *Service) Lock() {
 	s.km.ClearSession()
 }
 
+// ResetStoredKeys clears the active session and deletes local encrypted keys.
+func (s *Service) ResetStoredKeys() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetBlockchainState()
+	if err := s.km.DeleteStoredKeys(); err != nil {
+		return fmt.Errorf("delete stored keys: %w", err)
+	}
+	return nil
+}
+
 // ListEntries returns all password entries in the local vault.
 func (s *Service) ListEntries() ([]*vault.PasswordEntry, error) {
 	s.mu.Lock()

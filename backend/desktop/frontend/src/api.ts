@@ -51,6 +51,17 @@ export async function Lock(): Promise<void> {
   return LockRaw();
 }
 
+export async function ResetStoredKeys(): Promise<void> {
+  ensureWailsBridge();
+  const fn = (window as any)?.go?.main?.App?.ResetStoredKeys;
+  if (typeof fn !== "function") {
+    throw new Error(
+      "ResetStoredKeys is unavailable. Restart `wails dev` to regenerate bindings."
+    );
+  }
+  return fn();
+}
+
 export async function ListEntries(): Promise<Array<vault.PasswordEntry>> {
   ensureWailsBridge();
   return ListEntriesRaw();
