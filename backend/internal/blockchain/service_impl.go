@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"encryptkeep-backend/internal/codec"
@@ -120,7 +121,15 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 	ctx := context.Background()
 	userAddr := session.Address
 
-	metaBytes, err := bs.client.GetUserMetadata(ctx, userAddr)
+	var metaBytes []byte
+	err := bs.callWithReconnect(func() error {
+		b, callErr := bs.client.GetUserMetadata(ctx, userAddr)
+		if callErr != nil {
+			return callErr
+		}
+		metaBytes = b
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -141,7 +150,15 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 		}
 	}
 
-	ids, err := bs.client.GetActiveIds(ctx, userAddr)
+	var ids []*big.Int
+	err = bs.callWithReconnect(func() error {
+		fetchedIDs, callErr := bs.client.GetActiveIds(ctx, userAddr)
+		if callErr != nil {
+			return callErr
+		}
+		ids = fetchedIDs
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -153,7 +170,15 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 		if id == nil {
 			continue
 		}
-		dataBytes, err := bs.client.GetUserData(ctx, userAddr, id)
+		var dataBytes []byte
+		err := bs.callWithReconnect(func() error {
+			fetched, callErr := bs.client.GetUserData(ctx, userAddr, id)
+			if callErr != nil {
+				return callErr
+			}
+			dataBytes = fetched
+			return nil
+		})
 		if err != nil {
 			return err
 		}
@@ -174,4 +199,62 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 	v.IsDirty = false
 
 	return nil
+}
+
+func (bs *BlockchainServiceImpl) callWithReconnect(call func() error) error {
+	err := call()
+	if err == nil {
+		return nil
+	}
+	if !isTransientRPCError(err) {
+		return err
+	}
+	if reconnectErr := bs.reconnectAndRestoreSession(); reconnectErr != nil {
+		return fmt.Errorf("rpc call failed: %w (reconnect failed: %v)", err, reconnectErr)
+	}
+	return call()
+}
+
+func (bs *BlockchainServiceImpl) reconnectAndRestoreSession() error {
+	if bs.client == nil {
+		return ErrNotConnected
+	}
+	session := bs.client.GetSession()
+	if session == nil || session.PrivateKey == "" {
+		return ErrInvalidPrivateKey
+	}
+	_ = bs.client.Close()
+
+	client, err := NewClient(bs.config)
+	if err != nil {
+		return err
+	}
+	bs.client = client
+	_, err = bs.client.CreateSession(session.PrivateKey, session.MasterPassword)
+	return err
+}
+
+func isTransientRPCError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	markers := []string{
+		"timeout",
+		"deadline exceeded",
+		"temporarily unavailable",
+		"connection reset",
+		"connection refused",
+		"connection aborted",
+		"no such host",
+		"getaddrinfo",
+		"wsarecv",
+		"eof",
+	}
+	for _, marker := range markers {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
 }
