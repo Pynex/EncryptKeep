@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -136,7 +137,7 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 		if decoded, err := cdc.UnpackMetadata(metaBytes, session.MasterPassword); err == nil {
 			meta = decoded
 		} else {
-			return err
+			return fmt.Errorf("decrypt vault metadata: %w", err)
 		}
 	}
 
@@ -159,7 +160,7 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 
 		entry, err := cdc.UnpackEntry(dataBytes, session.MasterPassword)
 		if err != nil {
-			return err
+			return fmt.Errorf("decrypt vault entry (contract id %s): %w", id.String(), err)
 		}
 
 		entries[entry.ID] = entry

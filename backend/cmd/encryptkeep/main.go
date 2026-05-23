@@ -3,24 +3,18 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
 
-	"encryptkeep-backend/internal/blockchain"
-	"encryptkeep-backend/internal/keymanager"
-	"encryptkeep-backend/internal/vault"
-	"encryptkeep-backend/internal/vaultmanager"
-
-	"github.com/ethereum/go-ethereum/crypto"
+	"encryptkeep-backend/internal/appsvc"
 )
 
 // CLI entrypoint
 func main() {
-	km := keymanager.NewKeyManager(keymanager.KeyManagerConfig{})
+	app := appsvc.NewService()
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Print("Enter master password: ")
@@ -31,10 +25,11 @@ func main() {
 	if len(masterPassword) < 8 {
 		log.Fatalf("master password too short (min 8)")
 	}
+	ctx := context.Background()
 
-	if km.HasStoredKeys() {
-		if err := km.LoadFromStorage(masterPassword); err != nil {
-			log.Fatalf("load keys: %v", err)
+	if app.HasStoredKeys() {
+		if err := app.Unlock(ctx, masterPassword); err != nil {
+			log.Fatalf("unlock: %v", err)
 		}
 		fmt.Println("Keys loaded from storage.")
 	} else {
@@ -43,41 +38,17 @@ func main() {
 		if err != nil {
 			log.Fatalf("read private key: %v", err)
 		}
-		privHex = strings.TrimSpace(privHex)
-		if len(privHex) != 64 {
-			log.Fatalf("invalid private key length")
-		}
-		if _, err := hex.DecodeString(privHex); err != nil {
-			log.Fatalf("invalid private key hex: %v", err)
-		}
-		if err := km.InitializeFirstTime(privHex, masterPassword); err != nil {
+		if err := app.InitializeNewKeys(ctx, privHex, masterPassword); err != nil {
 			log.Fatalf("init keys: %v", err)
 		}
 		fmt.Println("Keys initialized and stored.")
 	}
 
-	privKey, err := km.GetPrivateKey()
+	n, lastSync, err := app.VaultStats()
 	if err != nil {
-		log.Fatalf("get private key: %v", err)
+		log.Fatalf("vault stats: %v", err)
 	}
-	privHex := hex.EncodeToString(crypto.FromECDSA(privKey))
-
-	svc := blockchain.NewBlockchainService(blockchain.GetDefaultConfig())
-	if err := svc.Connect(); err != nil {
-		log.Fatalf("blockchain connect: %v", err)
-	}
-	if _, err := svc.StartSession(privHex, masterPassword); err != nil {
-		log.Fatalf("start session: %v", err)
-	}
-
-	localVault := vault.NewLocalVault()
-	if err := svc.SyncVault(localVault); err != nil {
-		log.Fatalf("sync vault: %v", err)
-	}
-	fmt.Printf("Sync complete. Entries: %d, LastSync: %s\n", len(localVault.Entries), localVault.LastSyncTime.Format("2006-01-02 15:04:05"))
-
-	ctx := context.Background()
-	vm := vaultmanager.NewVaultManager(svc, masterPassword)
+	fmt.Printf("Sync complete. Entries: %d, LastSync: %s\n", n, lastSync.Format("2006-01-02 15:04:05"))
 
 	for {
 		fmt.Print("\nCommands: list, get, add, update, delete, sync, exit\n> ")
@@ -89,35 +60,37 @@ func main() {
 
 		switch cmd {
 		case "list":
-			if len(localVault.Entries) == 0 {
+			entries, err := app.ListEntries()
+			if err != nil {
+				fmt.Printf("list error: %v\n", err)
+				continue
+			}
+			if len(entries) == 0 {
 				fmt.Println("No entries.")
 				continue
 			}
 			fmt.Println("Entries:")
-			for id, e := range localVault.Entries {
+			for _, e := range entries {
 				fmt.Printf("- ID: %s | Title: %s | Username: %s | Updated: %s\n",
-					id, e.Title, e.Username, e.UpdatedAt.Format("2006-01-02 15:04:05"))
+					e.ID, e.Title, e.Username, e.UpdatedAt.Format("2006-01-02 15:04:05"))
 			}
 		case "get":
 			id := prompt(reader, "Entry ID", false)
-			entry, ok := localVault.Entries[id]
-			if !ok {
+			entry, err := app.GetEntry(id)
+			if err != nil {
 				fmt.Println("entry not found")
 				continue
 			}
 
 			fmt.Printf("ID: %s\nTitle: %s\nUsername: %s\nPassword: %s\nURL: %s\nUpdated: %s\n",
-        		entry.ID, entry.Title, entry.Username, entry.Password, entry.URL, entry.UpdatedAt.Format("2006-01-02 15:04:05"))
+				entry.ID, entry.Title, entry.Username, entry.Password, entry.URL, entry.UpdatedAt.Format("2006-01-02 15:04:05"))
 		case "add":
 			title := prompt(reader, "Title", false)
 			username := prompt(reader, "Username", false)
 			password := prompt(reader, "Password", false)
 			url := prompt(reader, "URL (optional)", true)
 
-			entry := vault.NewPasswordEntry(title, username, password)
-			entry.URL = url
-
-			if err := vm.AddEntry(ctx, localVault, entry); err != nil {
+			if err := app.AddEntry(ctx, title, username, password, url); err != nil {
 				fmt.Printf("add entry error: %v\n", err)
 				continue
 			}
@@ -125,8 +98,8 @@ func main() {
 
 		case "update":
 			id := prompt(reader, "Entry ID", false)
-			entry, ok := localVault.Entries[id]
-			if !ok {
+			entry, err := app.GetEntry(id)
+			if err != nil {
 				fmt.Println("entry not found")
 				continue
 			}
@@ -150,7 +123,7 @@ func main() {
 			}
 			entry.UpdatedAt = time.Now()
 
-			if err := vm.UpdateEntry(ctx, localVault, entry); err != nil {
+			if err := app.UpdateEntry(ctx, entry); err != nil {
 				fmt.Printf("update entry error: %v\n", err)
 				continue
 			}
@@ -158,22 +131,27 @@ func main() {
 
 		case "delete":
 			id := prompt(reader, "Entry ID", false)
-			if _, ok := localVault.Entries[id]; !ok {
+			if _, err := app.GetEntry(id); err != nil {
 				fmt.Println("entry not found")
 				continue
 			}
-			if err := vm.DeleteEntry(ctx, localVault, id); err != nil {
+			if err := app.DeleteEntry(ctx, id); err != nil {
 				fmt.Printf("delete entry error: %v\n", err)
 				continue
 			}
 			fmt.Println("Entry deleted and synced.")
 
 		case "sync":
-			if err := svc.SyncVault(localVault); err != nil {
+			if err := app.Sync(ctx); err != nil {
 				fmt.Printf("sync error: %v\n", err)
 				continue
 			}
-			fmt.Printf("Synced. Entries: %d, LastSync: %s\n", len(localVault.Entries), localVault.LastSyncTime.Format("2006-01-02 15:04:05"))
+			n, lastSync, err := app.VaultStats()
+			if err != nil {
+				fmt.Printf("stats error: %v\n", err)
+				continue
+			}
+			fmt.Printf("Synced. Entries: %d, LastSync: %s\n", n, lastSync.Format("2006-01-02 15:04:05"))
 
 		case "exit", "quit":
 			fmt.Println("Bye.")

@@ -198,7 +198,7 @@ func (km *KeyManager) LoadFromStorage(masterPassword string) error {
 
 	privateKeyHex, err := localcrypto.Open(masterPassword, codec.FromVaultConfig(vault.DefaultVaultConfig()), encrypted)
 	if err != nil {
-		return err
+		return fmt.Errorf("decrypt stored private key: %w", err)
 	}
 
 	privateKey, err := crypto.HexToECDSA(string(privateKeyHex))
