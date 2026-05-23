@@ -10,9 +10,21 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    name: Build Windows EXE
-    runs-on: windows-latest
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows/amd64
+            target: windows-amd64
+            tags: ""
+          - os: ubuntu-latest
+            platform: linux/amd64
+            target: linux-amd64
+            tags: "webkit2_41"
 
     steps:
       - name: Checkout
@@ -34,33 +46,75 @@ jobs:
         shell: bash
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
-      - name: Build Windows app
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev
+
+      - name: Build app
         working-directory: backend/desktop
         shell: bash
         run: |
-          wails build -clean -nopackage -platform windows/amd64 -o EncryptKeep -webview2 download -tags "webkit2_41"
+          if [[ "${{ matrix.tags }}" == "" ]]; then
+            wails build -clean -nopackage -platform "${{ matrix.platform }}" -o EncryptKeep -webview2 download
+          else
+            wails build -clean -nopackage -platform "${{ matrix.platform }}" -o EncryptKeep -webview2 download -tags "${{ matrix.tags }}"
+          fi
 
-      - name: Upload build artifact
+      - name: Normalize release filenames
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN_DIR="backend/desktop/build/bin"
+          RELEASE_DIR="release"
+          mkdir -p "$RELEASE_DIR"
+
+          if [[ "${{ matrix.target }}" == "windows-amd64" ]]; then
+            if [[ -f "$BIN_DIR/EncryptKeep.exe" ]]; then
+              cp "$BIN_DIR/EncryptKeep.exe" "$RELEASE_DIR/EncryptKeep-windows-amd64.exe"
+            elif [[ -f "$BIN_DIR/EncryptKeep" ]]; then
+              cp "$BIN_DIR/EncryptKeep" "$RELEASE_DIR/EncryptKeep-windows-amd64.exe"
+            else
+              echo "Windows binary not found in $BIN_DIR"
+              ls -la "$BIN_DIR"
+              exit 1
+            fi
+          else
+            if [[ -f "$BIN_DIR/EncryptKeep" ]]; then
+              cp "$BIN_DIR/EncryptKeep" "$RELEASE_DIR/EncryptKeep-linux-amd64"
+            elif [[ -f "$BIN_DIR/EncryptKeep.exe" ]]; then
+              cp "$BIN_DIR/EncryptKeep.exe" "$RELEASE_DIR/EncryptKeep-linux-amd64"
+            else
+              echo "Linux binary not found in $BIN_DIR"
+              ls -la "$BIN_DIR"
+              exit 1
+            fi
+            chmod +x "$RELEASE_DIR/EncryptKeep-linux-amd64"
+            tar -C "$RELEASE_DIR" -czf "$RELEASE_DIR/EncryptKeep-linux-amd64.tar.gz" EncryptKeep-linux-amd64
+          fi
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: EncryptKeep-windows-amd64-exe
-          path: |
-            backend/desktop/build/bin/EncryptKeep
-            backend/desktop/build/bin/EncryptKeep.exe
+          name: release-${{ matrix.target }}
+          path: release/*
           if-no-files-found: error
 
-      - name: Upload installer artifacts (if present)
-        uses: actions/upload-artifact@v4
+  publish-release:
+    name: Publish GitHub Release Assets
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: EncryptKeep-windows-installers
-          path: backend/desktop/build/bin/*installer*.exe
-          if-no-files-found: ignore
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
 
-      - name: Publish release assets
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish assets to release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            backend/desktop/build/bin/EncryptKeep
-            backend/desktop/build/bin/EncryptKeep.exe
-            backend/desktop/build/bin/*installer*.exe
+          files: release-assets/*
