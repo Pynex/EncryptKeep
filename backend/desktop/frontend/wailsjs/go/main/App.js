@@ -38,6 +38,10 @@ export function Lock() {
   return window['go']['main']['App']['Lock']();
 }
 
+export function ResetStoredKeys() {
+  return window['go']['main']['App']['ResetStoredKeys']();
+}
+
 export function Sync() {
   return window['go']['main']['App']['Sync']();
 }

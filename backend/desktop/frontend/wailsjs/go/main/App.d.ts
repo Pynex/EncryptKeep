@@ -21,6 +21,8 @@ export function ListEntries():Promise<Array<vault.PasswordEntry>>;
 
 export function Lock():Promise<void>;
 
+export function ResetStoredKeys():Promise<void>;
+
 export function Sync():Promise<void>;
 
 export function Unlock(arg1:string):Promise<void>;
