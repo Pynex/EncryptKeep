@@ -7,11 +7,12 @@ import (
 )
 
 type BlockchainConfig struct {
-	RPCEndpoint     string   `json:"rpc_endpoint"`
-	ContractAddress string   `json:"contract_address"`
-	ChainID         int64    `json:"chain_id"`
-	GasLimit        uint64   `json:"gas_limit"`
-	GasPrice        *big.Int `json:"gas_price"`
+	RPCEndpoint      string   `json:"rpc_endpoint"`
+	FallbackRPCs     []string `json:"fallback_rpc_endpoints"`
+	ContractAddress  string   `json:"contract_address"`
+	ChainID          int64    `json:"chain_id"`
+	GasLimit         uint64   `json:"gas_limit"`
+	GasPrice         *big.Int `json:"gas_price"`
 }
 
 type UserData struct {
@@ -41,7 +42,8 @@ type Session struct {
 
 func GetDefaultConfig() *BlockchainConfig {
 	return &BlockchainConfig{
-		RPCEndpoint:     "https://sepolia.base.org",
+		RPCEndpoint:  "https://sepolia.base.org",
+		FallbackRPCs: []string{"https://base-sepolia.infura.io/v3/7b47a0fd75a34e8a90bd638c59cc95be"},
 		ContractAddress: "0x02a06b3427A2D949E971Bd80606996C75ae9fEa9",
 		ChainID:         84532,
 		GasLimit:        1_000_000,

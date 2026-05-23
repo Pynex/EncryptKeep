@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -38,22 +39,57 @@ type Client struct {
 // }
 
 func NewClient(config *BlockchainConfig) (*Client, error) {
-	client, err := ethclient.Dial(config.RPCEndpoint)
-	if err != nil {
-		return nil, ErrConnectionFailed
+	endpoints := make([]string, 0, 1+len(config.FallbackRPCs))
+	if ep := strings.TrimSpace(config.RPCEndpoint); ep != "" {
+		endpoints = append(endpoints, ep)
+	}
+	for _, ep := range config.FallbackRPCs {
+		ep = strings.TrimSpace(ep)
+		if ep == "" {
+			continue
+		}
+		isDuplicate := false
+		for _, existing := range endpoints {
+			if existing == ep {
+				isDuplicate = true
+				break
+			}
+		}
+		if !isDuplicate {
+			endpoints = append(endpoints, ep)
+		}
 	}
 
-	contract, err := NewKeeperContract(client, config.ContractAddress)
-	if err != nil {
-		return nil, ErrContractNotFound
+	if len(endpoints) == 0 {
+		return nil, fmt.Errorf("%w: no rpc endpoints configured", ErrConnectionFailed)
 	}
 
-	return &Client{
-		config:   config,
-		client:   client,
-		contract: contract,
-		chainID:  big.NewInt(config.ChainID),
-	}, nil
+	var lastErr error
+	for _, endpoint := range endpoints {
+		client, err := ethclient.Dial(endpoint)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		contract, err := NewKeeperContract(client, config.ContractAddress)
+		if err != nil {
+			client.Close()
+			lastErr = err
+			continue
+		}
+
+		resolvedConfig := *config
+		resolvedConfig.RPCEndpoint = endpoint
+		return &Client{
+			config:   &resolvedConfig,
+			client:   client,
+			contract: contract,
+			chainID:  big.NewInt(config.ChainID),
+		}, nil
+	}
+
+	return nil, fmt.Errorf("%w: all rpc endpoints failed (primary=%s): %v", ErrConnectionFailed, config.RPCEndpoint, lastErr)
 }
 
 func (c *Client) EstimateGas(ctx context.Context, method string, args ...interface{}) (uint64, error) {
