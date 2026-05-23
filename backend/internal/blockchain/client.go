@@ -16,6 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+const rpcAttemptTimeout = 8 * time.Second
+
 type Client struct {
 	config   *BlockchainConfig
 	client   *ethclient.Client
@@ -66,16 +68,17 @@ func NewClient(config *BlockchainConfig) (*Client, error) {
 
 	var lastErr error
 	for _, endpoint := range endpoints {
-		client, err := ethclient.Dial(endpoint)
+		attemptCtx, cancel := context.WithTimeout(context.Background(), rpcAttemptTimeout)
+		client, err := ethclient.DialContext(attemptCtx, endpoint)
 		if err != nil {
+			cancel()
 			lastErr = err
 			continue
 		}
 
 		// Dial for HTTP RPC may defer actual network IO until first request.
 		// Probe the endpoint immediately so fallback can trigger early.
-		probeCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-		_, err = client.NetworkID(probeCtx)
+		_, err = client.NetworkID(attemptCtx)
 		cancel()
 		if err != nil {
 			client.Close()
