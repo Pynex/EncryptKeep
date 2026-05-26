@@ -40,7 +40,11 @@ type Client struct {
 // 	ChainID int64
 // }
 
-func NewClient(config *BlockchainConfig) (*Client, error) {
+// RPCEndpoints returns primary + fallback endpoints in priority order.
+func RPCEndpoints(config *BlockchainConfig) []string {
+	if config == nil {
+		return nil
+	}
 	endpoints := make([]string, 0, 1+len(config.FallbackRPCs))
 	if ep := strings.TrimSpace(config.RPCEndpoint); ep != "" {
 		endpoints = append(endpoints, ep)
@@ -50,14 +54,35 @@ func NewClient(config *BlockchainConfig) (*Client, error) {
 		if ep == "" {
 			continue
 		}
-		isDuplicate := false
 		for _, existing := range endpoints {
 			if existing == ep {
-				isDuplicate = true
+				ep = ""
 				break
 			}
 		}
-		if !isDuplicate {
+		if ep != "" {
+			endpoints = append(endpoints, ep)
+		}
+	}
+	return endpoints
+}
+
+func NewClient(config *BlockchainConfig) (*Client, error) {
+	return NewClientExcluding(config)
+}
+
+// NewClientExcluding dials the first working RPC, skipping excluded endpoints.
+func NewClientExcluding(config *BlockchainConfig, exclude ...string) (*Client, error) {
+	excluded := make(map[string]struct{}, len(exclude))
+	for _, ep := range exclude {
+		if ep = strings.TrimSpace(ep); ep != "" {
+			excluded[ep] = struct{}{}
+		}
+	}
+
+	endpoints := make([]string, 0, len(RPCEndpoints(config)))
+	for _, ep := range RPCEndpoints(config) {
+		if _, skip := excluded[ep]; !skip {
 			endpoints = append(endpoints, ep)
 		}
 	}
@@ -103,7 +128,14 @@ func NewClient(config *BlockchainConfig) (*Client, error) {
 		}, nil
 	}
 
-	return nil, fmt.Errorf("%w: all rpc endpoints failed (primary=%s): %v", ErrConnectionFailed, config.RPCEndpoint, lastErr)
+	return nil, fmt.Errorf("%w: all rpc endpoints failed (tried=%v): %v", ErrConnectionFailed, endpoints, lastErr)
+}
+
+func (c *Client) ActiveRPCEndpoint() string {
+	if c == nil || c.config == nil {
+		return ""
+	}
+	return c.config.RPCEndpoint
 }
 
 func (c *Client) EstimateGas(ctx context.Context, method string, args ...interface{}) (uint64, error) {

@@ -82,7 +82,7 @@ type SyncStatus struct {
 
 func DefaultVaultConfig() *VaultConfig {
 	return &VaultConfig{
-		Argon2Time:      3, 
+		Argon2Time:      3,
 		Argon2Memory:    64 * 1024,
 		Argon2Threads:   4,
 		Argon2KeyLength: 32,

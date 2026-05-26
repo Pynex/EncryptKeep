@@ -11,6 +11,8 @@ import (
 	"encryptkeep-backend/internal/vault"
 )
 
+const rpcCallTimeout = 12 * time.Second
+
 type BlockchainServiceImpl struct {
 	client *Client
 	config *BlockchainConfig
@@ -118,11 +120,12 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 	if session == nil || session.MasterPassword == "" {
 		return ErrInvalidPrivateKey
 	}
-	ctx := context.Background()
 	userAddr := session.Address
 
 	var metaBytes []byte
 	err := bs.callWithReconnect(func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), rpcCallTimeout)
+		defer cancel()
 		b, callErr := bs.client.GetUserMetadata(ctx, userAddr)
 		if callErr != nil {
 			return callErr
@@ -152,6 +155,8 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 
 	var ids []*big.Int
 	err = bs.callWithReconnect(func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), rpcCallTimeout)
+		defer cancel()
 		fetchedIDs, callErr := bs.client.GetActiveIds(ctx, userAddr)
 		if callErr != nil {
 			return callErr
@@ -172,6 +177,8 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 		}
 		var dataBytes []byte
 		err := bs.callWithReconnect(func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), rpcCallTimeout)
+			defer cancel()
 			fetched, callErr := bs.client.GetUserData(ctx, userAddr, id)
 			if callErr != nil {
 				return callErr
@@ -202,20 +209,35 @@ func (bs *BlockchainServiceImpl) SyncVault(v *vault.LocalVault) error {
 }
 
 func (bs *BlockchainServiceImpl) callWithReconnect(call func() error) error {
-	err := call()
-	if err == nil {
-		return nil
+	failedEndpoints := make([]string, 0, len(RPCEndpoints(bs.config)))
+	maxAttempts := len(RPCEndpoints(bs.config)) + 1
+	if maxAttempts < 2 {
+		maxAttempts = 2
 	}
-	if !isTransientRPCError(err) {
-		return err
+
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		err := call()
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+		if !isTransientRPCError(err) {
+			return wrapRPCError(bs.client, err)
+		}
+
+		if bs.client != nil {
+			failedEndpoints = appendUniqueEndpoint(failedEndpoints, bs.client.ActiveRPCEndpoint())
+		}
+		if reconnectErr := bs.reconnectExcluding(failedEndpoints...); reconnectErr != nil {
+			lastErr = fmt.Errorf("%w (reconnect failed: %v)", err, reconnectErr)
+			continue
+		}
 	}
-	if reconnectErr := bs.reconnectAndRestoreSession(); reconnectErr != nil {
-		return fmt.Errorf("rpc call failed: %w (reconnect failed: %v)", err, reconnectErr)
-	}
-	return call()
+	return wrapRPCError(bs.client, fmt.Errorf("all rpc endpoints exhausted: %w", lastErr))
 }
 
-func (bs *BlockchainServiceImpl) reconnectAndRestoreSession() error {
+func (bs *BlockchainServiceImpl) reconnectExcluding(exclude ...string) error {
 	if bs.client == nil {
 		return ErrNotConnected
 	}
@@ -225,12 +247,38 @@ func (bs *BlockchainServiceImpl) reconnectAndRestoreSession() error {
 	}
 	_ = bs.client.Close()
 
-	client, err := NewClient(bs.config)
+	client, err := NewClientExcluding(bs.config, exclude...)
 	if err != nil {
 		return err
 	}
 	bs.client = client
 	_, err = bs.client.CreateSession(session.PrivateKey, session.MasterPassword)
+	return err
+}
+
+func appendUniqueEndpoint(list []string, endpoint string) []string {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return list
+	}
+	for _, existing := range list {
+		if existing == endpoint {
+			return list
+		}
+	}
+	return append(list, endpoint)
+}
+
+func wrapRPCError(client *Client, err error) error {
+	if err == nil {
+		return nil
+	}
+	if client == nil {
+		return err
+	}
+	if ep := client.ActiveRPCEndpoint(); ep != "" {
+		return fmt.Errorf("rpc %s: %w", ep, err)
+	}
 	return err
 }
 
@@ -249,6 +297,9 @@ func isTransientRPCError(err error) bool {
 		"no such host",
 		"getaddrinfo",
 		"wsarecv",
+		"failed to respond",
+		"i/o timeout",
+		"network is unreachable",
 		"eof",
 	}
 	for _, marker := range markers {
